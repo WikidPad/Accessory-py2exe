@@ -151,6 +151,8 @@ class py2exe(Command):
         ('optimize=', 'O',
          "optimization level: -O1 for \"python -O\", "
          "-O2 for \"python -OO\", and -O0 to disable [default: -O0]"),
+        ('exeoptimize=', None,
+         "optimization level for executable [default: same as optimize]"),
         ('dist-dir=', 'd',
          "directory to put final built distributions in (default is dist)"),
 
@@ -191,6 +193,7 @@ class py2exe(Command):
         self.compressed = 0
         self.unbuffered = 0
         self.optimize = 0
+        self.exeoptimize = -1
         self.includes = None
         self.excludes = None
         self.ignores = None
@@ -205,6 +208,9 @@ class py2exe(Command):
 
     def finalize_options (self):
         self.optimize = int(self.optimize)
+        self.exeoptimize = int(self.exeoptimize)
+        if self.exeoptimize == -1:
+            self.exeoptimize = self.optimize
         self.excludes = fancy_split(self.excludes)
         self.includes = fancy_split(self.includes)
         self.ignores = fancy_split(self.ignores)
@@ -849,7 +855,7 @@ class py2exe(Command):
 
         si = struct.pack("iiii",
                          0x78563412, # a magic value,
-                         self.optimize,
+                         self.exeoptimize,    # self.optimize,
                          self.unbuffered,
                          len(code_bytes),
                          ) + relative_arcname + "\000"
