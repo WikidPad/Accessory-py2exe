@@ -23,6 +23,33 @@ STORE_GLOBAL = chr(dis.opname.index('STORE_GLOBAL'))
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
 HAVE_ARGUMENT = chr(dis.HAVE_ARGUMENT)
 
+
+# Addition to make scan_opcodes_25() work faster
+import re
+
+
+INTERESTING_OPS = frozenset((dis.opname.index('LOAD_CONST'),
+        dis.opname.index('IMPORT_NAME'), dis.opname.index('STORE_NAME'),
+        dis.opname.index('STORE_GLOBAL')))
+
+UNINTERESTING_HAVE_ARGUMENT = re.escape("".join(
+        [chr(i) for i in range(dis.HAVE_ARGUMENT, 256)
+        if i not in INTERESTING_OPS]))
+
+UNINTERESTING_NO_ARGUMENT = re.escape("".join(
+        [chr(i) for i in range(0, dis.HAVE_ARGUMENT)]))
+
+
+SCAN_25_RE = re.compile(r"(?:["+UNINTERESTING_HAVE_ARGUMENT+"]..|["+
+        UNINTERESTING_NO_ARGUMENT+"]|"+
+        re.escape(LOAD_CONST)+"..(?!"+ re.escape(LOAD_CONST)+")|"+
+        re.escape(LOAD_CONST)+".."+re.escape(LOAD_CONST)+
+        "..(?!"+re.escape(IMPORT_NAME)+"))*("+re.escape(STORE_NAME)+"..|"+
+        re.escape(STORE_GLOBAL)+"..|"+re.escape(LOAD_CONST)+".."+
+        re.escape(LOAD_CONST)+".."+re.escape(IMPORT_NAME)+"..)", re.DOTALL)
+
+
+
 # !!! NOTE BEFORE INCLUDING IN PYTHON DISTRIBUTION !!!
 # To clear up issues caused by the duplication of data structures between
 # the real Python modulefinder and this duplicate version, packagePathMap
@@ -379,6 +406,12 @@ class ModuleFinder:
         consts = co.co_consts
         LOAD_LOAD_AND_IMPORT = LOAD_CONST + LOAD_CONST + IMPORT_NAME
         while code:
+            match = SCAN_25_RE.match(code)
+            if not match:
+                break
+            if match.start(1) != -1:
+                code = code[match.start(1):]
+
             c = code[0]
             if c in STORE_OPS:
                 oparg, = unpack('<H', code[1:3])
