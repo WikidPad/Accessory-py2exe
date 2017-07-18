@@ -42,27 +42,34 @@
 #
 
 import sys
+import os
+import ctypes
+
+##print("this is boot_common")
+##print("PATH", repr(sys.path[0]), "thats it.")
+
 if sys.frozen == "windows_exe":
     class Stderr(object):
-        softspace = 0
         _file = None
         _error = None
-        def write(self, text, alert=sys._MessageBox, fname=sys.executable + '.log'):
+        def write(self, text, alert=ctypes.windll.user32.MessageBoxW,
+                  fname=os.path.splitext(sys.executable)[0] + '.log'):
             if self._file is None and self._error is None:
+                import atexit, os, sys
                 try:
                     self._file = open(fname, 'a')
-                except Exception, details:
+                except Exception as details:
                     self._error = details
-                    import atexit
                     atexit.register(alert, 0,
                                     "The logfile '%s' could not be opened:\n %s" % \
                                     (fname, details),
-                                    "Errors occurred")
+                                    "Errors in %r" % os.path.basename(sys.executable),
+                                    0)
                 else:
-                    import atexit
                     atexit.register(alert, 0,
                                     "See the logfile '%s' for details" % fname,
-                                    "Errors occurred")
+                                    "Errors in %r" % os.path.basename(sys.executable),
+                                    0)
             if self._file is not None:
                 self._file.write(text)
                 self._file.flush()
@@ -70,7 +77,6 @@ if sys.frozen == "windows_exe":
             if self._file is not None:
                 self._file.flush()
     sys.stderr = Stderr()
-    del sys._MessageBox
     del Stderr
 
     class Blackhole(object):
@@ -81,18 +87,18 @@ if sys.frozen == "windows_exe":
             pass
     sys.stdout = Blackhole()
     del Blackhole
-del sys
+del sys, ctypes
 
-# Disable linecache.getline() which is called by
-# traceback.extract_stack() when an exception occurs to try and read
-# the filenames embedded in the packaged python code.  This is really
-# annoying on windows when the d: or e: on our build box refers to
-# someone elses removable or network drive so the getline() call
-# causes it to ask them to insert a disk in that drive.
-import linecache
-def fake_getline(filename, lineno, module_globals=None):
-    return ''
-linecache.orig_getline = linecache.getline
-linecache.getline = fake_getline
-
-del linecache, fake_getline
+## # Disable linecache.getline() which is called by
+## # traceback.extract_stack() when an exception occurs to try and read
+## # the filenames embedded in the packaged python code.  This is really
+## # annoying on windows when the d: or e: on our build box refers to
+## # someone elses removable or network drive so the getline() call
+## # causes it to ask them to insert a disk in that drive.
+## import linecache
+## def fake_getline(filename, lineno, module_globals=None):
+##     return ''
+## linecache.orig_getline = linecache.getline
+## linecache.getline = fake_getline
+##
+##del linecache, fake_getline

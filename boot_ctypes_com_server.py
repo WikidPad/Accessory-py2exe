@@ -12,7 +12,7 @@ if 1:
         def __init__(self):
             self.softspace = None
         def write(self, text):
-            if isinstance(text, unicode):
+            if isinstance(text, str):
                 ctypes.windll.kernel32.OutputDebugStringW(text)
             else:
                 ctypes.windll.kernel32.OutputDebugStringA(text)
@@ -42,9 +42,9 @@ else:
 try:
     com_module_names
 except NameError:
-    print "This script is designed to be run from inside py2exe % s" % str(details)
+    print("This script is designed to be run from inside py2exe % s" % str(details))
     sys.exit(1)
-    
+
 com_modules = []
 for name in com_module_names:
     __import__(name)
