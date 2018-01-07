@@ -24,6 +24,29 @@ STORE_GLOBAL = bytes([dis.opname.index('STORE_GLOBAL')])
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
 HAVE_ARGUMENT = bytes([dis.HAVE_ARGUMENT])
 
+
+# Addition to make scan_opcodes() work faster
+import re
+
+INTERESTING_OPS = frozenset((dis.opname.index('LOAD_CONST'),
+        dis.opname.index('IMPORT_NAME'), dis.opname.index('STORE_NAME'),
+        dis.opname.index('STORE_GLOBAL')))
+
+UNINTERESTING_HAVE_ARGUMENT = re.escape(bytes(
+        i for i in range(dis.HAVE_ARGUMENT, 256)
+        if i not in INTERESTING_OPS))
+
+UNINTERESTING_NO_ARGUMENT = re.escape(bytes(range(0, dis.HAVE_ARGUMENT)))
+
+SCAN_34_RE = re.compile(rb"(?:["+UNINTERESTING_HAVE_ARGUMENT+b"]..|["+
+        UNINTERESTING_NO_ARGUMENT+b"]|"+
+        re.escape(LOAD_CONST)+b"..(?!"+ re.escape(LOAD_CONST)+b")|"+
+        re.escape(LOAD_CONST)+b".."+re.escape(LOAD_CONST)+
+        b"..(?!"+re.escape(IMPORT_NAME)+b"))*("+re.escape(STORE_NAME)+b"..|"+
+        re.escape(STORE_GLOBAL)+b"..|"+re.escape(LOAD_CONST)+b".."+
+        re.escape(LOAD_CONST)+b".."+re.escape(IMPORT_NAME)+b"..)", re.DOTALL)
+
+
 # Monkeypatch some missing methods in Python 3.3's NamespaceLoader
 def __patch_py33():
     if sys.version_info < (3, 4):
@@ -411,6 +434,12 @@ class ModuleFinder:
         consts = co.co_consts
         LOAD_LOAD_AND_IMPORT = LOAD_CONST + LOAD_CONST + IMPORT_NAME
         while code:
+            match = SCAN_34_RE.match(code)
+            if not match:
+                break
+            if match.start(1) != -1:
+                code = code[match.start(1):]
+
             c = bytes([code[0]])
             if c in STORE_OPS:
                 oparg, = unpack('<H', code[1:3])
